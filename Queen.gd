@@ -14,3 +14,18 @@ func _ready():
     set_texture(tex)
 
     position = get_parent().cell2pos(coords)
+    
+
+func get_possible_moves(cell: Vector2) -> Array:
+    """Determines the possible moves given the current position and player label.
+    
+    Args:
+        cell (Vector2): the cell's coordinates for this piece.
+       
+    Returns:
+        Array: a list of Vector2 cell locations where the piece may move.
+    """
+
+    var possible_moves = []
+    
+    return possible_moves
