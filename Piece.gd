@@ -72,23 +72,100 @@ func find_possible_moves() -> void:
 
         TYPE.ROOK:
             
-            pass
+            var dirs = [Vector2(0, 1), Vector2(0, -1), Vector2(1, 0), Vector2(-1, 0),]
+            for dir in dirs:
+                var dist = 1
+                while true:
+                    var proposed_cell = coords + (dir * dist)
+                    if get_parent().cell_in_bounds(proposed_cell):
+                        var occupant = get_parent().get_occupant(proposed_cell)
+                        if occupant:
+                            if capturable(proposed_cell):
+                                possible_moves.append([proposed_cell, true])
+                            break
+                            
+                        else:
+                            possible_moves.append([proposed_cell, false])
+                    else:
+                        break
+                    dist += 1
         
         TYPE.BISHOP:
             
-            pass
+            var dirs = [Vector2(1, 1), Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1),]
+            for dir in dirs:
+                var dist = 1
+                while true:
+                    var proposed_cell = coords + (dir * dist)
+                    if get_parent().cell_in_bounds(proposed_cell):
+                        var occupant = get_parent().get_occupant(proposed_cell)
+                        if occupant:
+                            if capturable(proposed_cell):
+                                possible_moves.append([proposed_cell, true])
+                            break
+                            
+                        else:
+                            possible_moves.append([proposed_cell, false])
+                    else:
+                        break
+                    dist += 1
         
         TYPE.KNIGHT:
             
-            pass
+            var dirs = [
+                Vector2(2, 1), Vector2(2, -1), Vector2(1, 2), Vector2(1, -2),
+                Vector2(-2, 1), Vector2(-2, -1), Vector2(-1, 2), Vector2(-1, -2),
+            ]
+            for dir in dirs:
+                var proposed_cell = coords + dir
+                if get_parent().cell_in_bounds(proposed_cell):
+                    var occupant = get_parent().get_occupant(proposed_cell)
+                    if occupant:
+                        if capturable(proposed_cell):
+                            possible_moves.append([proposed_cell, true])
+                        
+                    else:
+                        possible_moves.append([proposed_cell, false])
         
         TYPE.KING:
             
-            pass
+            var dirs = [
+                Vector2(0, 1), Vector2(0, -1), Vector2(1, 0), Vector2(-1, 0),
+                Vector2(1, 1), Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1),
+            ]
+            for dir in dirs:
+                var proposed_cell = coords + dir
+                if get_parent().cell_in_bounds(proposed_cell):
+                    var occupant = get_parent().get_occupant(proposed_cell)
+                    if occupant:
+                        if capturable(proposed_cell):
+                            possible_moves.append([proposed_cell, true])
+                        
+                    else:
+                        possible_moves.append([proposed_cell, false])
         
         TYPE.QUEEN:
             
-            pass
+            var dirs = [
+                Vector2(0, 1), Vector2(0, -1), Vector2(1, 0), Vector2(-1, 0),
+                Vector2(1, 1), Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1),
+            ]
+            for dir in dirs:
+                var dist = 1
+                while true:
+                    var proposed_cell = coords + (dir * dist)
+                    if get_parent().cell_in_bounds(proposed_cell):
+                        var occupant = get_parent().get_occupant(proposed_cell)
+                        if occupant:
+                            if capturable(proposed_cell):
+                                possible_moves.append([proposed_cell, true])
+                            break
+                            
+                        else:
+                            possible_moves.append([proposed_cell, false])
+                    else:
+                        break
+                    dist += 1
 
 
 func get_sprite_path() -> String:
@@ -136,6 +213,17 @@ func move(cell: Vector2) -> void:
     coords = cell
     # sets a pixel location relative to the parent
     position = get_parent().cell2pos(coords)
+    
+    if type == TYPE.PAWN:
+        if is_black and cell.y == 7:
+            promote()
+        elif not is_black and cell.y == 0:
+            promote()
+
+
+func promote() -> void:
+    # TO DO 
+    pass
 
 
 func repr() -> String:
