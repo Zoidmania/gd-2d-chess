@@ -1,17 +1,16 @@
 extends TileMap
 
 
-# Preload the scenes for the pieces
-var PAWN_SCENE = preload("res://Pawn.tscn")
-var ROOK_SCENE = preload("res://Rook.tscn")
-var KNIGHT_SCENE = preload("res://Knight.tscn")
-var BISHOP_SCENE = preload("res://Bishop.tscn")
-var KING_SCENE = preload("res://King.tscn")
-var QUEEN_SCENE = preload("res://Queen.tscn")
+var PIECE_SCENE = preload("res://Piece.tscn")
+var POSSIBLE_MOVE_SCENE = preload("res://PossibleMove.tscn")
 
 var ACTIVE_PIECES = []
 var CAPTURED_PIECES_WHITE = [] # black pieces that the white player has captured
-var CAPTURE_PIECES_BLACK = [] # white pieces that the black player has captured
+var CAPTURED_PIECES_BLACK = [] # white pieces that the black player has captured
+
+# cells currently indicating a possible move for the last selected piece.
+var ACTIVE_POSSIBLE_MOVES = []
+var SELECTED_PIECE
 
 
 func _ready():
@@ -19,7 +18,51 @@ func _ready():
     init_game_board()
 
 
-func cell_in_bounds(cell) -> bool:
+func __calc_next_position_in_capture_box() -> Vector2:
+    
+    if get_parent().CURRENT_TURN == get_parent().PLAYER.WHITE:
+        
+        return Vector2(
+            cell_size[0] * (len(CAPTURED_PIECES_WHITE) % 2) + (cell_size[0] / 2),
+            # warning-ignore:integer_division
+            cell_size[1] * (len(CAPTURED_PIECES_WHITE) / 2) + (cell_size[1] / 2)
+        ) + get_node("WhiteCaptureZone").position
+
+    else:
+
+        return Vector2(
+            cell_size[0] * (len(CAPTURED_PIECES_BLACK) % 2) + (cell_size[0] / 2),
+            # warning-ignore:integer_division
+            cell_size[1] * (len(CAPTURED_PIECES_BLACK) / 2) + (cell_size[1] / 2)
+        ) + get_node("BlackCaptureZone").position
+    
+
+func capture(piece) -> void:
+    """Captures a piece at the specified location to the specified player's box, and removes it from
+    the game board.
+    
+    Args:
+        piece (Piece): a piece on the game board.
+    """
+    
+    assert(piece in ACTIVE_PIECES)
+    
+    ACTIVE_PIECES.erase(piece)
+    piece.coords = Vector2(-1, -1)
+    piece.position = __calc_next_position_in_capture_box()
+    
+    if get_parent().CURRENT_TURN == get_parent().PLAYER.WHITE:
+    
+        assert(piece.is_black)
+        CAPTURED_PIECES_WHITE.append(piece)
+    
+    else:
+    
+        assert(not piece.is_black)
+        CAPTURED_PIECES_BLACK.append(piece)
+
+
+func cell_in_bounds(cell: Vector2) -> bool:
     """Checks whether a cell is within bounds.
     
     A standard chess board is 8x8.
@@ -64,6 +107,14 @@ func cell2pos(cell: Vector2) -> Vector2:
     return pos
 
 
+func clear_possible_moves() -> void:
+    """Removes the actively drawn possible moves from the game board."""
+    while len(ACTIVE_POSSIBLE_MOVES) > 0:
+        var pm = ACTIVE_POSSIBLE_MOVES[0]
+        ACTIVE_POSSIBLE_MOVES.erase(pm)
+        pm.queue_free()
+
+
 func draw_possible_moves(possible_moves: Array) -> void:
     """Draws the possible moves a piece may make on the gmae board.
     
@@ -71,8 +122,14 @@ func draw_possible_moves(possible_moves: Array) -> void:
         possible_moves (Array): of Vector2 cell locations where a piece may move.
     """
     
-    for cell in possible_moves:
-        pass
+    for entry in possible_moves:
+        
+        var pm = POSSIBLE_MOVE_SCENE.instance()
+        pm.coords = entry[0] # cell
+        if entry[1]: # capture flag
+            pm.capturable = true
+        add_child(pm)
+        ACTIVE_POSSIBLE_MOVES.append(pm)
 
 
 func get_occupant(cell: Vector2):
@@ -84,13 +141,30 @@ func get_occupant(cell: Vector2):
         cell (Vector2): the cell's coordinates.
         
     Returns:
-        Either one of the Piece types (Pawn, Rook, Knight, Bishop, King, or Queen) or a `null` if
-        the cell was empty.
+        Either a Piece occupying the cell or a `null` if the cell was empty.
     """
     
     for piece in ACTIVE_PIECES:
         if piece.coords == cell:
             return piece
+    
+    return null
+
+
+func get_possible_move(cell: Vector2) -> PossibleMove:
+    """Gets the piece in a specified cell, if one exists there.
+    
+    Does not consider captured pieces.
+    
+    Args:
+        cell (Vector2): the cell's coordinates.
+        
+    Returns:
+        Either a Piece occupying the cell or a `null` if the cell was empty.
+    """
+    for pm in ACTIVE_POSSIBLE_MOVES:
+        if pm.coords == cell:
+            return pm
     
     return null
 
@@ -114,28 +188,54 @@ func handle_selection(cell: Vector2, current_turn: int) -> void:
         cell (Vector2): the cell's coordinates.
         current_turn (int): the player ID for the current turn, based on the `Main.PLAYER` enum.
     """
-    
-    var piece = get_occupant(cell)
-    if piece:
+
+    var pm = get_possible_move(cell)
+    if pm:
         
-        print(
-            "[DEBUG] Found ", "Black " if piece.is_black else "White ",
-            piece.get_name(), " at cell ", cell, "."
-        )
-    
-        var possible_moves = []        
+        print("[DEBUG] Found possible move for piece ", SELECTED_PIECE.repr(), ".")
+        print(">>> Moving piece ", SELECTED_PIECE.repr(), " to cell ", cell, ".")
         
-        if (current_turn == get_parent().PLAYER.WHITE and not piece.is_black) or \
-            (current_turn == get_parent().PLAYER.BLACK and piece.is_black):
+        if pm.capturable:
+        
+            var target = get_occupant(cell)
+            assert(target != null)
+            assert(target.is_black == (not SELECTED_PIECE.is_black))
+        
+            capture(target)
+        
+        SELECTED_PIECE.move(cell)
+        
+        # reset
+        SELECTED_PIECE = null
+        get_parent().next_turn()
+    
+    else: # might be a piece
+        
+        var occupant = get_occupant(cell)
+        if occupant:
             
-            possible_moves = piece.get_possible_moves(cell)
+            clear_possible_moves()
+            
+            print(
+                "[DEBUG] Found piece ", occupant.repr(), " at cell ", occupant.coords, "."
+            )
+
+            if (current_turn == get_parent().PLAYER.WHITE and not occupant.is_black) or \
+                    (current_turn == get_parent().PLAYER.BLACK and occupant.is_black):
+                
+                occupant.find_possible_moves()
+                print(">>> Possible moves: ", occupant.possible_moves)
+                draw_possible_moves(occupant.possible_moves)
+                SELECTED_PIECE = occupant
+            
+            else:
+                
+                print(">>> Not player's turn!")
         
-        print("[DEBUG] Possible moves: ", possible_moves)
-        draw_possible_moves(possible_moves)
-    
-    else:
-        
-        print("[DEBUG] Nothing there.")
+        else: 
+            
+            print("[DEBUG] Nothing there.")
+            clear_possible_moves()
     
 
 func init_game_board() -> void:
@@ -143,106 +243,129 @@ func init_game_board() -> void:
        
     # white pawns
     for _i in range(8):
-        var pawn = PAWN_SCENE.instance()
-        pawn.coords = Vector2(_i, 6)
-        add_child(pawn)
-        ACTIVE_PIECES.append(pawn)
+        var piece = PIECE_SCENE.instance()
+        piece.coords = Vector2(_i, 6)
+        add_child(piece)
+        ACTIVE_PIECES.append(piece)
 
     # white rooks
-    var rook = ROOK_SCENE.instance()
-    rook.coords = Vector2(0, 7)
-    add_child(rook)
-    ACTIVE_PIECES.append(rook)
-    rook = ROOK_SCENE.instance()
-    rook.coords = Vector2(7, 7)
-    add_child(rook)
-    ACTIVE_PIECES.append(rook)
+    var piece = PIECE_SCENE.instance()
+    piece.coords = Vector2(0, 7)
+    piece.type = piece.TYPE.ROOK
+    add_child(piece)
+    ACTIVE_PIECES.append(piece)
+    piece = PIECE_SCENE.instance()
+    piece.coords = Vector2(7, 7)
+    piece.type = piece.TYPE.ROOK
+    add_child(piece)
+    ACTIVE_PIECES.append(piece)
 
     # white knights
-    var knight = KNIGHT_SCENE.instance()
-    knight.coords = Vector2(1, 7)
-    add_child(knight)
-    ACTIVE_PIECES.append(knight)
-    knight = KNIGHT_SCENE.instance()
-    knight.coords = Vector2(6, 7)
-    add_child(knight)
-    ACTIVE_PIECES.append(knight)
+    piece = PIECE_SCENE.instance()
+    piece.coords = Vector2(1, 7)
+    piece.type = piece.TYPE.KNIGHT
+    add_child(piece)
+    ACTIVE_PIECES.append(piece)
+    piece = PIECE_SCENE.instance()
+    piece.coords = Vector2(6, 7)
+    piece.type = piece.TYPE.KNIGHT
+    add_child(piece)
+    ACTIVE_PIECES.append(piece)
 
     # white bishops
-    var bishop = BISHOP_SCENE.instance()
-    bishop.coords = Vector2(2, 7)
-    add_child(bishop)
-    ACTIVE_PIECES.append(bishop)
-    bishop = BISHOP_SCENE.instance()
-    bishop.coords = Vector2(5, 7)
-    add_child(bishop)
-    ACTIVE_PIECES.append(bishop)
-    
+    piece = PIECE_SCENE.instance()
+    piece.coords = Vector2(2, 7)
+    piece.type = piece.TYPE.BISHOP
+    add_child(piece)
+    ACTIVE_PIECES.append(piece)
+    piece = PIECE_SCENE.instance()
+    piece.coords = Vector2(5, 7)
+    piece.type = piece.TYPE.BISHOP
+    add_child(piece)
+    ACTIVE_PIECES.append(piece)
+
     # white royals
-    var king = KING_SCENE.instance()
-    king.coords = Vector2(3, 7)
-    add_child(king)
-    ACTIVE_PIECES.append(king)
-    var queen = QUEEN_SCENE.instance()
-    queen.coords = Vector2(4, 7)
-    add_child(queen)
-    ACTIVE_PIECES.append(queen)
-    
+    piece = PIECE_SCENE.instance()
+    piece.coords = Vector2(3, 7)
+    piece.type = piece.TYPE.KING
+    add_child(piece)
+    ACTIVE_PIECES.append(piece)
+    piece = PIECE_SCENE.instance()
+    piece.coords = Vector2(4, 7)
+    piece.type = piece.TYPE.QUEEN
+    add_child(piece)
+    ACTIVE_PIECES.append(piece)
+
     # black pawns
     for _i in range(8):
-        var pawn = PAWN_SCENE.instance()
-        pawn.coords = Vector2(_i, 1)
-        pawn.is_black = true
-        add_child(pawn)
-        ACTIVE_PIECES.append(pawn)
-    
+        piece = PIECE_SCENE.instance()
+        piece.coords = Vector2(_i, 1)
+        piece.is_black = true
+        add_child(piece)
+        ACTIVE_PIECES.append(piece)
+
     # black rooks
-    rook = ROOK_SCENE.instance()
-    rook.coords = Vector2(0, 0)
-    rook.is_black = true
-    add_child(rook)
-    ACTIVE_PIECES.append(rook)
-    rook = ROOK_SCENE.instance()
-    rook.coords = Vector2(7, 0)
-    rook.is_black = true
-    add_child(rook)
-    ACTIVE_PIECES.append(rook)
-    
+    piece = PIECE_SCENE.instance()
+    piece.coords = Vector2(0, 0)
+    piece.type = piece.TYPE.ROOK
+    piece.is_black = true
+    add_child(piece)
+    ACTIVE_PIECES.append(piece)
+    piece = PIECE_SCENE.instance()
+    piece.coords = Vector2(7, 0)
+    piece.type = piece.TYPE.ROOK
+    piece.is_black = true
+    add_child(piece)
+    ACTIVE_PIECES.append(piece)
+
     # black knights
-    knight = KNIGHT_SCENE.instance()
-    knight.coords = Vector2(1, 0)
-    knight.is_black = true
-    add_child(knight)
-    ACTIVE_PIECES.append(knight)
-    knight = KNIGHT_SCENE.instance()
-    knight.coords = Vector2(6, 0)
-    knight.is_black = true
-    add_child(knight)
-    ACTIVE_PIECES.append(knight)
-    
+    piece = PIECE_SCENE.instance()
+    piece.coords = Vector2(1, 0)
+    piece.type = piece.TYPE.KNIGHT
+    piece.is_black = true
+    add_child(piece)
+    ACTIVE_PIECES.append(piece)
+    piece = PIECE_SCENE.instance()
+    piece.coords = Vector2(6, 0)
+    piece.type = piece.TYPE.KNIGHT
+    piece.is_black = true
+    add_child(piece)
+    ACTIVE_PIECES.append(piece)
+
     # black bishops
-    bishop = BISHOP_SCENE.instance()
-    bishop.coords = Vector2(2, 0)
-    bishop.is_black = true
-    add_child(bishop)
-    ACTIVE_PIECES.append(bishop)
-    bishop = BISHOP_SCENE.instance()
-    bishop.coords = Vector2(5, 0)
-    bishop.is_black = true
-    add_child(bishop)
-    ACTIVE_PIECES.append(bishop)
-    
+    piece = PIECE_SCENE.instance()
+    piece.coords = Vector2(2, 0)
+    piece.type = piece.TYPE.BISHOP
+    piece.is_black = true
+    add_child(piece)
+    ACTIVE_PIECES.append(piece)
+    piece = PIECE_SCENE.instance()
+    piece.coords = Vector2(5, 0)
+    piece.type = piece.TYPE.BISHOP
+    piece.is_black = true
+    add_child(piece)
+    ACTIVE_PIECES.append(piece)
+
     # black royals
-    king = KING_SCENE.instance()
-    king.coords = Vector2(4, 0)
-    king.is_black = true
-    add_child(king)
-    ACTIVE_PIECES.append(king)
-    queen = QUEEN_SCENE.instance()
-    queen.coords = Vector2(3, 0)
-    queen.is_black = true
-    add_child(queen)
-    ACTIVE_PIECES.append(queen)
+    piece = PIECE_SCENE.instance()
+    piece.coords = Vector2(4, 0)
+    piece.type = piece.TYPE.KING
+    piece.is_black = true
+    add_child(piece)
+    ACTIVE_PIECES.append(piece)
+    piece = PIECE_SCENE.instance()
+    piece.coords = Vector2(3, 0)
+    piece.type = piece.TYPE.QUEEN
+    piece.is_black = true
+    add_child(piece)
+    ACTIVE_PIECES.append(piece)
+
+#    # TEST
+#    piece = PIECE_SCENE.instance()
+#    piece.coords = Vector2(3, 2)
+#    piece.is_black = true
+#    add_child(piece)
+#    ACTIVE_PIECES.append(piece)
 
 
 func pos2cell(position: Vector2) -> Vector2:

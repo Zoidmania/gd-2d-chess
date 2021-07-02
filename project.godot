@@ -8,6 +8,22 @@
 
 config_version=4
 
+_global_script_classes=[ {
+"base": "Sprite",
+"class": "Piece",
+"language": "GDScript",
+"path": "res://Piece.gd"
+}, {
+"base": "Sprite",
+"class": "PossibleMove",
+"language": "GDScript",
+"path": "res://PossibleMove.gd"
+} ]
+_global_script_class_icons={
+"Piece": "",
+"PossibleMove": ""
+}
+
 [application]
 
 config/name="2D Chess"

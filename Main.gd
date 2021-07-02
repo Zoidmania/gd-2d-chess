@@ -14,11 +14,14 @@ func _ready():
     
     # for now, just start with black. implement a coin toss later.
     CURRENT_TURN = PLAYER.BLACK
+    get_node("TurnIndicatorLabel").text = "Current Turn: Black"
     print("[DEBUG] First player turn: ", CURRENT_TURN)
     
     # for now, just start the game immediately. implement a start/pause later.
     PAUSED = false
     print("[DEBUG] Game paused: ", PAUSED)
+    
+    print(Vector2(0, -1) + Vector2(4, 4))
 
 
 func _input(event):
@@ -37,12 +40,13 @@ func _input(event):
         
         var relative_pos = event.position - game_board.transform.origin
         var cell = game_board.pos2cell(relative_pos)
-        print(">>> Cell: ", cell)
         var in_bounds = game_board.cell_in_bounds(cell)
-        print(">>> ", "Is" if in_bounds else "Isn't", " in bounds.")
-        
         if in_bounds:
+            print(">>> Cell: ", cell)
             game_board.handle_selection(cell, CURRENT_TURN)
+        else:
+            print(">>> Isn't in bounds.")
+            game_board.clear_possible_moves()
     
 
 func next_turn() -> void:
@@ -53,4 +57,9 @@ func next_turn() -> void:
     elif CURRENT_TURN == PLAYER.BLACK:
         CURRENT_TURN = PLAYER.WHITE
 
+    get_node("TurnIndicatorLabel").text = "Current Turn: " + \
+        ("Black" if CURRENT_TURN == PLAYER.BLACK else "White")
+
     print("[DEBUG] Player turn is now ", CURRENT_TURN)
+
+    get_node("TileMap").clear_possible_moves()
