@@ -62,7 +62,7 @@ func capture(piece) -> void:
         CAPTURED_PIECES_BLACK.append(piece)
     
     if piece.type == piece.TYPE.KING:
-        pass # handle winning
+        get_parent().win()
 
 
 func cell_in_bounds(cell: Vector2) -> bool:

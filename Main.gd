@@ -92,6 +92,14 @@ func toggle_pause() -> void:
     print("[DEBUG] Game paused: ", PAUSED)
 
 
+func win() -> void:
+    """Shows a dialog that the current player is the winner."""
+    
+    get_node("WinnerConfirmationDialog").popup_centered()
+    get_node("WinnerConfirmationDialog").dialog_text = \
+        ("Black" if CURRENT_TURN == PLAYER.BLACK else "White") + " wins!"
+
+
 func _on_ButtonReset_pressed():
     self.get_node("TileMap").empty_gameboard()
 
@@ -106,3 +114,9 @@ func _on_ButtonStart_pressed():
 func _on_ButtonQuit_pressed():
     """Gracefully quit the game."""
     get_tree().quit()
+
+
+func _on_WinnerConfirmationDialog_confirmed():
+    self.get_node("TileMap").empty_gameboard()
+    coin_toss()
+    get_node("TileMap").init_game_board()
