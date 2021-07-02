@@ -222,7 +222,7 @@ func move(cell: Vector2) -> void:
 
 
 func promote() -> void:
-    # TO DO 
+    # TO DO
     pass
 
 

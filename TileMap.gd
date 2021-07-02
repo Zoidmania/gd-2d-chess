@@ -15,7 +15,7 @@ var SELECTED_PIECE
 
 func _ready():
     
-    init_game_board()
+    pass
 
 
 func __calc_next_position_in_capture_box() -> Vector2:
@@ -38,7 +38,7 @@ func __calc_next_position_in_capture_box() -> Vector2:
     
 
 func capture(piece) -> void:
-    """Captures a piece at the specified location to the specified player's box, and removes it from
+    """Captures a piece at the specified location to the current player's box, and removes it from
     the game board.
     
     Args:
@@ -60,6 +60,9 @@ func capture(piece) -> void:
     
         assert(not piece.is_black)
         CAPTURED_PIECES_BLACK.append(piece)
+    
+    if piece.type == piece.TYPE.KING:
+        pass # handle winning
 
 
 func cell_in_bounds(cell: Vector2) -> bool:
@@ -130,6 +133,20 @@ func draw_possible_moves(possible_moves: Array) -> void:
             pm.capturable = true
         add_child(pm)
         ACTIVE_POSSIBLE_MOVES.append(pm)
+
+
+func empty_gameboard() -> void:
+    """Removes all pieces from the game."""
+    
+    for piece in ACTIVE_PIECES:
+        piece.queue_free()
+    ACTIVE_PIECES = []
+    for piece in CAPTURED_PIECES_BLACK:
+        piece.queue_free()
+    CAPTURED_PIECES_BLACK = []
+    for piece in CAPTURED_PIECES_WHITE:
+        piece.queue_free()
+    CAPTURED_PIECES_WHITE = []
 
 
 func get_occupant(cell: Vector2):
@@ -240,7 +257,7 @@ func handle_selection(cell: Vector2, current_turn: int) -> void:
 
 func init_game_board() -> void:
     """Initialize the game board with player pieces."""
-       
+        
     # white pawns
     for _i in range(8):
         var piece = PIECE_SCENE.instance()
@@ -359,13 +376,6 @@ func init_game_board() -> void:
     piece.is_black = true
     add_child(piece)
     ACTIVE_PIECES.append(piece)
-
-#    # TEST
-#    piece = PIECE_SCENE.instance()
-#    piece.coords = Vector2(3, 2)
-#    piece.is_black = true
-#    add_child(piece)
-#    ACTIVE_PIECES.append(piece)
 
 
 func pos2cell(position: Vector2) -> Vector2:
